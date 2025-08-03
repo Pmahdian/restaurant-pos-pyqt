@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QTableWidget, QTableWidgetItem,
     QTabWidget, QHeaderView, QSpinBox, QMessageBox,
-    QToolBar, QDialog, QStackedWidget
+    QToolBar, QDialog
 )
 from PyQt6.QtCore import Qt
 from datetime import datetime
@@ -36,17 +36,15 @@ class MainWindow(QMainWindow):
         toolbar = QToolBar("ابزارهای اصلی")
         self.addToolBar(toolbar)
         
-        # دکمه بازگشت به سفارش‌گیری
+        # دکمه‌های نوار ابزار
         order_btn = QPushButton("سفارش جدید")
         order_btn.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(0))
         toolbar.addWidget(order_btn)
         
-        # دکمه گزارش فروش
         report_btn = QPushButton("گزارش فروش روزانه")
         report_btn.clicked.connect(self.show_daily_sales)
         toolbar.addWidget(report_btn)
         
-        # دکمه حذف همه
         clear_btn = QPushButton("حذف همه داده‌ها")
         clear_btn.setStyleSheet("background-color: #e74c3c; color: white;")
         clear_btn.clicked.connect(self.clear_all_data)
@@ -62,7 +60,7 @@ class MainWindow(QMainWindow):
         self.invoice_label.setStyleSheet("font-weight: bold; color: #2c3e50;")
         layout.addWidget(self.invoice_label)
         
-        # --- بخش منو و سفارش ---
+        # بخش اصلی سفارش
         order_layout = QHBoxLayout()
         
         # تب‌های دسته‌بندی
@@ -124,7 +122,6 @@ class MainWindow(QMainWindow):
         
         right_section.addLayout(calc_layout)
         order_layout.addLayout(right_section, 2)
-        
         layout.addLayout(order_layout)
         page.setLayout(layout)
         return page
@@ -150,9 +147,115 @@ class MainWindow(QMainWindow):
             tab.setLayout(layout)
             self.categories_tabs.addTab(tab, category)
 
-    # بقیه متدها (add_to_order, remove_item, calculate_total, etc.) 
-    # همانند نسخه قبلی باقی می‌مانند
-    
+    def add_to_order(self, item):
+        """اضافه کردن آیتم به سفارش"""
+        existing = next((i for i in self.current_order if i["id"] == item["id"]), None)
+        if existing:
+            existing["quantity"] += 1
+        else:
+            self.current_order.append({
+                "id": item["id"],
+                "name": item["name"],
+                "price": item["price"],
+                "quantity": 1
+            })
+        self.update_order_table()
+
+    def update_order_table(self):
+        """به‌روزرسانی جدول سفارشات"""
+        self.order_table.setRowCount(len(self.current_order))
+        for row, item in enumerate(self.current_order):
+            self.order_table.setItem(row, 0, QTableWidgetItem(item["name"]))
+            self.order_table.setItem(row, 1, QTableWidgetItem(f"{item['price']:,}"))
+            self.order_table.setItem(row, 2, QTableWidgetItem(str(item["quantity"])))
+            
+            # دکمه حذف
+            remove_btn = QPushButton("حذف")
+            remove_btn.clicked.connect(lambda _, r=row: self.remove_item(r))
+            self.order_table.setCellWidget(row, 3, remove_btn)
+        
+        self.calculate_total()
+
+    def remove_item(self, row):
+        """حذف آیتم از سفارش"""
+        if 0 <= row < len(self.current_order):
+            self.current_order.pop(row)
+            self.update_order_table()
+
+    def calculate_total(self):
+        """محاسبه جمع کل با اعمال حق سرویس و تخفیف"""
+        subtotal = sum(item["price"] * item["quantity"] for item in self.current_order)
+        service_fee = subtotal * self.service_spin.value() / 100
+        discount = (subtotal + service_fee) * self.discount_spin.value() / 100
+        total = subtotal + service_fee - discount
+        
+        self.total_label.setText(
+            f"جمع کل: {total:,.0f} تومان\n"
+            f"(جزء: {subtotal:,.0f} | "
+            f"سرویس: {service_fee:,.0f} | "
+            f"تخفیف: {discount:,.0f})"
+        )
+        return total, service_fee, discount
+
+    def print_invoice(self):
+        """چاپ فاکتور و ذخیره"""
+        if not self.current_order:
+            QMessageBox.warning(self, "خطا", "سبد خرید خالی است!")
+            return
+            
+        total, service_fee, discount = self.calculate_total()
+        invoice_id = self.save_invoice_action(total, service_fee, discount)
+        
+        # تولید PDF
+        pdf_path = generate_invoice_pdf(
+            self.current_order,
+            invoice_id,
+            datetime.now().strftime("%Y/%m/%d %H:%M"),
+            total,
+            service_fee,
+            discount
+        )
+        
+        # چاپ خودکار (ویندوز)
+        if os.name == 'nt':
+            os.startfile(pdf_path, "print")
+        
+        QMessageBox.information(self, "موفق", "فاکتور چاپ و ذخیره شد.")
+        self.reset_after_save()
+
+    def save_invoice(self):
+        """ذخیره فاکتور بدون چاپ"""
+        if not self.current_order:
+            QMessageBox.warning(self, "خطا", "سبد خرید خالی است!")
+            return
+            
+        total, service_fee, discount = self.calculate_total()
+        self.save_invoice_action(total, service_fee, discount)
+        self.reset_after_save()
+
+    def save_invoice_action(self, total, service_fee, discount):
+        """ذخیره موقت فاکتور"""
+        invoice = {
+            "id": len(self.temp_invoices) + 1,
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "items": self.current_order.copy(),
+            "total": total,
+            "service_fee": service_fee,
+            "discount": discount
+        }
+        self.temp_invoices.append(invoice)
+        return invoice["id"]
+
+    def reset_after_save(self):
+        """بازنشانی پس از ذخیره"""
+        self.current_order = []
+        self.order_table.setRowCount(0)
+        self.invoice_counter += 1
+        self.invoice_label.setText(
+            f"فاکتور # {self.invoice_counter} | تاریخ: {datetime.now().strftime('%Y/%m/%d %H:%M')}"
+        )
+        self.discount_spin.setValue(0)
+
     def show_daily_sales(self):
         """نمایش گزارش فروش روزانه"""
         if not self.temp_invoices:
@@ -173,7 +276,7 @@ class MainWindow(QMainWindow):
         
         # جدول گزارش
         table = QTableWidget()
-        table.setColumnCount(6)
+        table.setColumnCount(7)
         table.setHorizontalHeaderLabels(["شماره", "تاریخ", "آیتم‌ها", "جمع جزء", "سرویس", "تخفیف", "جمع کل"])
         table.verticalHeader().setVisible(False)
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -223,6 +326,41 @@ class MainWindow(QMainWindow):
         
         report_dialog.setLayout(layout)
         report_dialog.exec()
-    
-    # بقیه متدها (save_permanent, print_report, clear_all_data, etc.)
-    # همانند نسخه قبلی باقی می‌مانند
+
+    def save_permanent(self):
+        """ذخیره دائمی در فایل JSON"""
+        try:
+            with open("daily_sales.json", "w", encoding="utf-8") as f:
+                json.dump(self.temp_invoices, f, ensure_ascii=False, indent=4)
+            QMessageBox.information(self, "موفق", "گزارش با موفقیت ذخیره شد")
+        except Exception as e:
+            QMessageBox.critical(self, "خطا", f"خطا در ذخیره گزارش: {str(e)}")
+
+    def print_report(self):
+        """چاپ گزارش به صورت PDF"""
+        try:
+            filename = f"daily_report_{datetime.now().strftime('%Y%m%d')}.pdf"
+            generate_invoice_pdf(self.temp_invoices, filename)
+            QMessageBox.information(self, "موفق", f"گزارش در فایل {filename} ذخیره شد")
+        except Exception as e:
+            QMessageBox.critical(self, "خطا", f"خطا در تولید گزارش: {str(e)}")
+
+    def clear_all_data(self):
+        """حذف تمام داده‌ها"""
+        reply = QMessageBox.question(
+            self,
+            "تایید حذف",
+            "آیا مطمئنید می‌خواهید تمام داده‌ها را حذف کنید؟",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            self.temp_invoices = []
+            self.current_order = []
+            self.order_table.setRowCount(0)
+            self.total_label.setText("جمع کل: 0 تومان")
+            self.invoice_counter = 1
+            self.invoice_label.setText(
+                f"فاکتور # {self.invoice_counter} | تاریخ: {datetime.now().strftime('%Y/%m/%d %H:%M')}"
+            )
+            QMessageBox.information(self, "موفق", "تمام داده‌ها حذف شدند")
