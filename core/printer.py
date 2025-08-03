@@ -1,53 +1,50 @@
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4, mm
+from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, Table, TableStyle
 from reportlab.lib import colors
-from datetime import datetime
 
-def generate_invoice_pdf(invoice_data, output_path):
-    """تولید فاکتور PDF برای چاپ یا ذخیره"""
-    c = canvas.Canvas(output_path, pagesize=A4)
+def generate_invoice_pdf(items, filename, invoice_number):
+    """تولید فاکتور PDF برای مشتری"""
+    c = canvas.Canvas(filename, pagesize=A4)
     width, height = A4
     
-    # استایل‌ها
-    styles = getSampleStyleSheet()
+    # هدر فاکتور
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(100, 800, "فاکتور فروش رستوران")
+    c.drawString(100, 780, f"شماره: {invoice_number}")
+    c.drawString(100, 760, f"تاریخ: {invoice_number}")
     
-    # --- هدر ---
-    header = [
-        "فاکتور فروش رستوران",
-        f"تاریخ: {datetime.now().strftime('%Y/%m/%d %H:%M')}",
-        "-------------------------"
-    ]
+    # خط جداکننده
+    c.line(100, 750, 500, 750)
     
-    y_position = height - 40
-    for line in header:
-        c.setFont("Helvetica-Bold", 14)
-        c.drawString(30, y_position, line)
-        y_position -= 20
-    
-    # --- آیتم‌ها ---
-    y_position -= 20
+    # آیتم‌ها
+    y_position = 720
     c.setFont("Helvetica-Bold", 12)
-    c.drawString(30, y_position, "آیتم")
-    c.drawString(200, y_position, "تعداد")
-    c.drawString(300, y_position, "جمع")
+    c.drawString(100, y_position, "آیتم")
+    c.drawString(300, y_position, "تعداد")
+    c.drawString(400, y_position, "جمع")
     y_position -= 20
     
     c.setFont("Helvetica", 10)
-    for item in invoice_data["items"]:
-        c.drawString(30, y_position, item["name"])
-        c.drawString(200, y_position, str(item["quantity"]))
-        c.drawString(300, y_position, f"{item['price'] * item['quantity']:,}")
+    for item in items:
+        c.drawString(100, y_position, item["name"])
+        c.drawString(300, y_position, str(item["quantity"]))
+        c.drawString(400, y_position, f"{item['price'] * item['quantity']:,}")
         y_position -= 15
     
-    # --- جمع کل ---
+    # محاسبات نهایی
+    subtotal = sum(item["price"] * item["quantity"] for item in items)
     y_position -= 20
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(30, y_position, f"جمع کل: {invoice_data['total']:,} تومان")
+    c.line(100, y_position, 500, y_position)
+    y_position -= 20
     
-    # --- پاورقی ---
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(300, y_position, "جمع کل:")
+    c.drawString(400, y_position, f"{subtotal:,} تومان")
+    
+    # پاورقی
     c.setFont("Helvetica-Oblique", 8)
-    c.drawString(30, 20, "با تشکر از خرید شما - شماره تماس: 021-12345678")
+    c.drawString(100, 30, "با تشکر از خرید شما - شماره تماس: 021-12345678")
     
     c.save()
