@@ -9,6 +9,24 @@ from datetime import datetime
 import os
 
 class MainWindow(QMainWindow):
+
+    def setup_menu_tabs(self):
+        """ایجاد تب‌های دسته‌بندی منو"""
+        for category, items in MENU.items():
+            tab = QWidget()
+            layout = QVBoxLayout()
+
+            # ایجاد دکمه‌های آیتم‌ها
+            for item in items:
+                btn = QPushButton(f"{item['name']}\n{item['price']:,} تومان")
+                btn.setMinimumHeight(60)
+                btn.clicked.connect(lambda _, item=item: self.add_to_order(item))
+                layout.addWidget(btn)
+
+            tab.setLayout(layout)
+            self.categories_tabs.addTab(tab, category)
+
+    
     def __init__(self):
         super().__init__()
         self.setWindowTitle("سیستم سفارش رستوران - نسخه نهایی")
