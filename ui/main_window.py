@@ -1,87 +1,93 @@
 from PyQt6.QtWidgets import (
-    QMainWindow, QTabWidget, QWidget, 
-    QVBoxLayout, QHBoxLayout,
-    QPushButton, QTableWidget,
-    QTableWidgetItem, QLineEdit,
-    QDoubleSpinBox, QLabel
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QPushButton, QComboBox, QSpinBox, QLabel, QTableWidget,
+    QTableWidgetItem, QHeaderView
 )
-from database.models import Item
+from PyQt6.QtCore import Qt
+from database.models import MENU
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("رستوران من - سیستم صندوق")
-        self.setGeometry(100, 100, 800, 600)
-        
-        # تب‌های اصلی
-        self.tabs = QTabWidget()
-        
-        # تب منو
-        self.setup_menu_tab()
-        
-        # تب سفارشات
-        self.setup_order_tab()
-        
-        self.setCentralWidget(self.tabs)
-    
-    def setup_menu_tab(self):
-        """تنظیم تب مدیریت منو"""
-        tab = QWidget()
+        self.setWindowTitle("سیستم سفارش رستوران")
+        self.setup_ui()
+
+    def setup_ui(self):
+        # لیست سفارشات جاری
+        self.order_items = []
+
+        # ویجت‌های اصلی
+        self.category_combo = QComboBox()
+        self.category_combo.addItems(MENU.keys())
+        self.category_combo.currentTextChanged.connect(self.update_items_combo)
+
+        self.item_combo = QComboBox()
+        self.update_items_combo()
+
+        self.quantity_spin = QSpinBox()
+        self.quantity_spin.setMinimum(1)
+        self.quantity_spin.setValue(1)
+
+        self.add_btn = QPushButton("اضافه به سفارش")
+        self.add_btn.clicked.connect(self.add_to_order)
+
+        # جدول سفارشات
+        self.order_table = QTableWidget(0, 3)
+        self.order_table.setHorizontalHeaderLabels(["آیتم", "تعداد", "قیمت"])
+        self.order_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+
+        # لایه‌بندی
         layout = QVBoxLayout()
+        form_layout = QHBoxLayout()
+        form_layout.addWidget(QLabel("دسته‌بندی:"))
+        form_layout.addWidget(self.category_combo)
+        form_layout.addWidget(QLabel("آیتم:"))
+        form_layout.addWidget(self.item_combo)
+        form_layout.addWidget(QLabel("تعداد:"))
+        form_layout.addWidget(self.quantity_spin)
+        form_layout.addWidget(self.add_btn)
+
+        layout.addLayout(form_layout)
+        layout.addWidget(self.order_table)
+
+        container = QWidget()
+        container.setLayout(layout)
+        self.setCentralWidget(container)
+
+    def update_items_combo(self):
+        """آپدیت لیست آیتم‌ها براساس دسته‌بندی انتخاب‌شده"""
+        category = self.category_combo.currentText()
+        self.item_combo.clear()
+        for item in MENU[category]:
+            self.item_combo.addItem(item["name"])
+
+    def add_to_order(self):
+        """اضافه کردن آیتم به سفارش"""
+        category = self.category_combo.currentText()
+        item_name = self.item_combo.currentText()
+        quantity = self.quantity_spin.value()
+
+        # پیدا کردن قیمت آیتم
+        price = next(
+            item["price"] for item in MENU[category] 
+            if item["name"] == item_name
+        )
+
+        # اضافه به لیست سفارش
+        self.order_items.append({
+            "name": item_name,
+            "quantity": quantity,
+            "price": price
+        })
+
+        # آپدیت جدول
+        self.update_order_table()
+
+    def update_order_table(self):
+        """نمایش سفارشات در جدول"""
+        self.order_table.setRowCount(len(self.order_items))
+        for row, item in enumerate(self.order_items):
+            self.order_table.setItem(row, 0, QTableWidgetItem(item["name"]))
+            self.order_table.setItem(row, 1, QTableWidgetItem(str(item["quantity"])))
+            self.order_table.setItem(row, 2, QTableWidgetItem(f"{item['price'] * item['quantity']:,} تومان"))
         
-        # فرم اضافه کردن آیتم
-        self.item_name = QLineEdit()
-        self.item_price = QDoubleSpinBox()
-        self.item_price.setMaximum(999999)
-        add_btn = QPushButton("اضافه کردن آیتم")
-        add_btn.clicked.connect(self.add_item)
-        
-        # جدول نمایش آیتم‌ها
-        self.items_table = QTableWidget()
-        self.items_table.setColumnCount(2)
-        self.items_table.setHorizontalHeaderLabels(["نام", "قیمت"])
-        
-        layout.addWidget(QLabel("آیتم جدید:"))
-        layout.addWidget(self.item_name)
-        layout.addWidget(QLabel("قیمت:"))
-        layout.addWidget(self.item_price)
-        layout.addWidget(add_btn)
-        layout.addWidget(self.items_table)
-        
-        tab.setLayout(layout)
-        self.tabs.addTab(tab, "مدیریت منو")
-    
-    def add_item(self):
-        """اضافه کردن آیتم جدید به منو"""
-        name = self.item_name.text()
-        price = self.item_price.value()
-        
-        if name and price > 0:
-            item = Item(name, price)
-            item.save()
-            self.load_items()
-            self.item_name.clear()
-            self.item_price.setValue(0)
-    
-    def load_items(self):
-        """بارگذاری آیتم‌ها در جدول"""
-        conn = create_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM items")
-        items = cursor.fetchall()
-        conn.close()
-        
-        self.items_table.setRowCount(len(items))
-        for row, item in enumerate(items):
-            self.items_table.setItem(row, 0, QTableWidgetItem(item[1]))
-            self.items_table.setItem(row, 1, QTableWidgetItem(str(item[2])))
-    
-    def setup_order_tab(self):
-        """تنظیم تب سفارشات"""
-        tab = QWidget()
-        layout = QVBoxLayout()
-        
-        # پیاده‌سازی رابط سفارشات اینجا
-        
-        tab.setLayout(layout)
-        self.tabs.addTab(tab, "ثبت سفارش")
