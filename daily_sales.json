@@ -1,0 +1,65 @@
+[
+    {
+        "id": 1,
+        "date": "2025-08-03 23:30:26",
+        "items": [
+            {
+                "id": 3,
+                "name": "چلوکباب",
+                "price": 85000,
+                "quantity": 1
+            },
+            {
+                "id": 4,
+                "name": "قیمه",
+                "price": 65000,
+                "quantity": 1
+            }
+        ],
+        "total": 165000.0,
+        "service_fee": 15000.0,
+        "discount": 0.0
+    },
+    {
+        "id": 2,
+        "date": "2025-08-03 23:30:41",
+        "items": [
+            {
+                "id": 3,
+                "name": "چلوکباب",
+                "price": 85000,
+                "quantity": 3
+            }
+        ],
+        "total": 280500.0,
+        "service_fee": 25500.0,
+        "discount": 0.0
+    },
+    {
+        "id": 3,
+        "date": "2025-08-03 23:32:04",
+        "items": [
+            {
+                "id": 3,
+                "name": "چلوکباب",
+                "price": 85000,
+                "quantity": 2
+            },
+            {
+                "id": 5,
+                "name": "آب معدنی",
+                "price": 8000,
+                "quantity": 2
+            },
+            {
+                "id": 6,
+                "name": "دوغ",
+                "price": 10000,
+                "quantity": 1
+            }
+        ],
+        "total": 196000.0,
+        "service_fee": 0.0,
+        "discount": 0.0
+    }
+]

@@ -2,13 +2,16 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QTableWidget, QTableWidgetItem,
     QTabWidget, QHeaderView, QSpinBox, QMessageBox,
-    QToolBar, QDialog
+    QToolBar, QDialog, QStackedWidget  # <-- اینجا اضافه شد
 )
 from PyQt6.QtCore import Qt
 from datetime import datetime
 from core.printer import generate_invoice_pdf
 import json
 import os
+from openpyxl import Workbook
+from pathlib import Path
+import platform
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -328,11 +331,29 @@ class MainWindow(QMainWindow):
         report_dialog.exec()
 
     def save_permanent(self):
-        """ذخیره دائمی در فایل JSON"""
+        """ذخیره دائمی گزارش در پوشه فروش کل روی دسکتاپ"""
         try:
-            with open("daily_sales.json", "w", encoding="utf-8") as f:
-                json.dump(self.temp_invoices, f, ensure_ascii=False, indent=4)
-            QMessageBox.information(self, "موفق", "گزارش با موفقیت ذخیره شد")
+            # ایجاد پوشه فروش کل اگر وجود نداشته باشد
+            desktop = get_desktop_path()
+            sales_folder = desktop / "فروش کل"
+            sales_folder.mkdir(exist_ok=True)
+            
+            # نام فایل براساس تاریخ
+            date_str = datetime.now().strftime("%Y-%m-%d")
+            
+            # ذخیره به صورت PDF
+            pdf_path = sales_folder / f"فروش_{date_str}.pdf"
+            generate_invoice_pdf(self.temp_invoices, str(pdf_path))
+            
+            # ذخیره به صورت Excel
+            excel_path = sales_folder / f"فروش_{date_str}.xlsx"
+            self.save_to_excel(str(excel_path))
+            
+            QMessageBox.information(
+                self, 
+                "موفق", 
+                f"گزارش با موفقیت ذخیره شد:\nPDF: {pdf_path}\nExcel: {excel_path}"
+            )
         except Exception as e:
             QMessageBox.critical(self, "خطا", f"خطا در ذخیره گزارش: {str(e)}")
 
@@ -364,3 +385,48 @@ class MainWindow(QMainWindow):
                 f"فاکتور # {self.invoice_counter} | تاریخ: {datetime.now().strftime('%Y/%m/%d %H:%M')}"
             )
             QMessageBox.information(self, "موفق", "تمام داده‌ها حذف شدند")
+
+
+    def get_desktop_path():
+        """پیدا کردن مسیر دسکتاپ براساس سیستم عامل"""
+        home = Path.home()
+        if platform.system() == "Windows":
+            return home / "Desktop"
+        elif platform.system() == "Darwin":  # macOS
+            return home / "Desktop"
+        else:  # Linux
+            return home / "Desktop"
+        
+
+    def save_to_excel(self, file_path):
+        """ذخیره گزارش در فایل اکسل"""
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "گزارش فروش"
+        
+        # هدرهای جدول
+        headers = [
+            "شماره فاکتور", "تاریخ", "آیتم‌ها", 
+            "تعداد", "قیمت واحد", "جمع جزء", 
+            "حق سرویس", "تخفیف", "جمع کل"
+        ]
+        ws.append(headers)
+        
+        # اضافه کردن داده‌ها
+        for inv in self.temp_invoices:
+            for item in inv["items"]:
+                row = [
+                    inv["id"],
+                    inv["date"],
+                    item["name"],
+                    item["quantity"],
+                    item["price"],
+                    item["price"] * item["quantity"],
+                    inv["service_fee"],
+                    inv["discount"],
+                    inv["total"]
+                ]
+                ws.append(row)
+        
+        # ذخیره فایل
+        wb.save(file_path)
