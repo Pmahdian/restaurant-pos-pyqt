@@ -10,6 +10,26 @@ import os
 
 class MainWindow(QMainWindow):
 
+    def __init__(self):
+        super().__init__()
+        
+        # تعریف تمام متغیرهای کلاس
+        self.current_order = []
+        self.invoice_counter = 1
+        self.categories_tabs = None
+        self.order_table = None
+        self.service_spin = None
+        self.discount_spin = None
+        self.total_label = None
+        self.print_btn = None
+        self.save_btn = None
+        self.invoice_label = None
+        
+        self.setWindowTitle("سیستم سفارش رستوران - نسخه نهایی")
+        self.setup_ui()
+      
+
+
     def setup_menu_tabs(self):
         """ایجاد تب‌های دسته‌بندی منو"""
         for category, items in MENU.items():
@@ -27,14 +47,6 @@ class MainWindow(QMainWindow):
             self.categories_tabs.addTab(tab, category)
 
     
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("سیستم سفارش رستوران - نسخه نهایی")
-        self.current_order = []
-        self.setup_ui()
-        
-        # شماره فاکتور خودکار
-        self.invoice_counter = 1
 
     def setup_ui(self):
         main_layout = QHBoxLayout()
