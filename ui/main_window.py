@@ -180,3 +180,42 @@ class MainWindow(QMainWindow):
             f"فاکتور # {self.invoice_counter} | تاریخ: {datetime.now().strftime('%Y/%m/%d %H:%M')}"
         )
         self.discount_spin.setValue(0)
+
+    def add_to_order(self, item):
+        """اضافه کردن آیتم به سفارش"""
+        # بررسی وجود آیتم در سفارش
+        existing = next((i for i in self.current_order if i["id"] == item["id"]), None)
+        
+        if existing:
+            existing["quantity"] += 1
+        else:
+            self.current_order.append({
+                "id": item["id"],
+                "name": item["name"],
+                "price": item["price"],
+                "quantity": 1
+            })
+        
+        self.update_order_table()
+
+    def update_order_table(self):
+        """آپدیت جدول سفارشات"""
+        self.order_table.setRowCount(len(self.current_order))
+
+        for row, item in enumerate(self.current_order):
+            self.order_table.setItem(row, 0, QTableWidgetItem(item["name"]))
+            self.order_table.setItem(row, 1, QTableWidgetItem(f"{item['price']:,}"))
+            self.order_table.setItem(row, 2, QTableWidgetItem(str(item["quantity"])))
+
+            # دکمه حذف
+            remove_btn = QPushButton("حذف")
+            remove_btn.clicked.connect(lambda _, r=row: self.remove_item(r))
+            self.order_table.setCellWidget(row, 3, remove_btn)
+
+        self.calculate_total()
+
+    def remove_item(self, row):
+        """حذف آیتم از سفارش"""
+        if 0 <= row < len(self.current_order):
+            self.current_order.pop(row)
+            self.update_order_table()
