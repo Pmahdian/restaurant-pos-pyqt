@@ -1,108 +1,53 @@
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.platypus import Table, TableStyle
+from reportlab.lib.pagesizes import A4, mm
 from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import Paragraph
+from reportlab.platypus import Paragraph, Table, TableStyle
+from reportlab.lib import colors
 from datetime import datetime
-import os
 
-def generate_invoice_pdf(invoices, output_path):
-    """تولید PDF حرفه‌ای برای گزارش فروش روزانه"""
+def generate_invoice_pdf(invoice_data, output_path):
+    """تولید فاکتور PDF برای چاپ یا ذخیره"""
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     
-    # استایل‌های پایه
+    # استایل‌ها
     styles = getSampleStyleSheet()
-    title_style = styles['Heading1']
-    title_style.alignment = 1  # وسط چین
     
-    # --- هدر گزارش ---
-    title = Paragraph(f"<b>گزارش فروش روزانه رستوران</b>", title_style)
-    title.wrapOn(c, width-100, 50)
-    title.drawOn(c, 50, height-50)
+    # --- هدر ---
+    header = [
+        "فاکتور فروش رستوران",
+        f"تاریخ: {datetime.now().strftime('%Y/%m/%d %H:%M')}",
+        "-------------------------"
+    ]
     
-    # اطلاعات تاریخ و شماره
-    c.setFont("Helvetica", 10)
-    c.drawRightString(width-50, height-40, f"تاریخ تولید: {datetime.now().strftime('%Y/%m/%d %H:%M')}")
+    y_position = height - 40
+    for line in header:
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(30, y_position, line)
+        y_position -= 20
     
-    # خط جداکننده
-    c.line(50, height-70, width-50, height-70)
-    
-    # --- محاسبات کل ---
-    y_position = height-100
+    # --- آیتم‌ها ---
+    y_position -= 20
     c.setFont("Helvetica-Bold", 12)
-    
-    daily_total = sum(inv["total"] for inv in invoices)
-    service_total = sum(inv["service_fee"] for inv in invoices)
-    discount_total = sum(inv["discount"] for inv in invoices)
-    
-    c.drawString(50, y_position, f"تعداد فاکتورها: {len(invoices)}")
-    c.drawString(300, y_position, f"جمع کل فروش: {daily_total:,} تومان")
-    y_position -= 25
-    
-    c.drawString(50, y_position, f"مجموع حق سرویس: {service_total:,} تومان")
-    c.drawString(300, y_position, f"مجموع تخفیف‌ها: {discount_total:,} تومان")
-    y_position -= 40
-    
-    # --- جدول فاکتورها ---
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, y_position, "خلاصه فاکتورها:")
+    c.drawString(30, y_position, "آیتم")
+    c.drawString(200, y_position, "تعداد")
+    c.drawString(300, y_position, "جمع")
     y_position -= 20
     
-    # داده‌های جدول
-    data = [["شماره", "ساعت", "تعداد آیتم‌ها", "جمع جزء", "سرویس", "تخفیف", "جمع نهایی"]]
+    c.setFont("Helvetica", 10)
+    for item in invoice_data["items"]:
+        c.drawString(30, y_position, item["name"])
+        c.drawString(200, y_position, str(item["quantity"]))
+        c.drawString(300, y_position, f"{item['price'] * item['quantity']:,}")
+        y_position -= 15
     
-    for inv in invoices:
-        subtotal = sum(item["price"]*item["quantity"] for item in inv["items"])
-        data.append([
-            str(inv["id"]),
-            inv["date"][11:16],
-            str(len(inv["items"])),
-            f"{subtotal:,}",
-            f"{inv['service_fee']:,}",
-            f"{inv['discount']:,}",
-            f"{inv['total']:,}"
-        ])
-    
-    # طراحی جدول
-    table = Table(data, colWidths=[40, 40, 60, 80, 80, 80, 80])
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2c3e50')),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,0), 10),
-        ('BOTTOMPADDING', (0,0), (-1,0), 12),
-        ('BACKGROUND', (0,1), (-1,-1), colors.HexColor('#f8f9fa')),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
-        ('FONTSIZE', (0,1), (-1,-1), 9),
-    ]))
-    
-    table.wrapOn(c, width-100, height)
-    table.drawOn(c, 50, y_position-20-len(invoices)*20)
-    
-    # --- جزئیات آیتم‌ها ---
-    y_position -= len(invoices)*20 + 50
+    # --- جمع کل ---
+    y_position -= 20
     c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, y_position, "جزئیات آیتم‌های فروش:")
-    y_position -= 30
+    c.drawString(30, y_position, f"جمع کل: {invoice_data['total']:,} تومان")
     
-    for inv in invoices:
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(50, y_position, f"فاکتور #{inv['id']} - {inv['date'][:16]}")
-        y_position -= 20
-        
-        c.setFont("Helvetica", 9)
-        for item in inv["items"]:
-            item_text = f"{item['name']} ({item['quantity']} × {item['price']:,}) = {item['price']*item['quantity']:,}"
-            c.drawString(70, y_position, item_text)
-            y_position -= 15
-        
-        y_position -= 10
-    
-    # پاورقی
+    # --- پاورقی ---
     c.setFont("Helvetica-Oblique", 8)
-    c.drawCentredString(width/2, 30, "این گزارش به صورت خودکار توسط سیستم صندوق رستوران تولید شده است")
+    c.drawString(30, 20, "با تشکر از خرید شما - شماره تماس: 021-12345678")
     
     c.save()

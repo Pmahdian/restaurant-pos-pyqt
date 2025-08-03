@@ -213,30 +213,46 @@ class MainWindow(QMainWindow):
         return total, service_fee, discount
 
     def print_invoice(self):
-        """چاپ فاکتور و ذخیره"""
-        if not self.current_order:
-            QMessageBox.warning(self, "خطا", "سبد خرید خالی است!")
-            return
+        """چاپ فوری فاکتور و آماده‌سازی برای سفارش بعدی"""
+        try:
+            if not self.current_order:
+                QMessageBox.warning(self, "خطا", "سبد خرید خالی است!")
+                return
+
+            # محاسبه جمع کل
+            total, service_fee, discount = self.calculate_total()
             
-        total, service_fee, discount = self.calculate_total()
-        invoice_id = self.save_invoice_action(total, service_fee, discount)
-        
-        # تولید PDF
-        pdf_path = generate_invoice_pdf(
-            self.current_order,
-            invoice_id,
-            datetime.now().strftime("%Y/%m/%d %H:%M"),
-            total,
-            service_fee,
-            discount
-        )
-        
-        # چاپ خودکار (ویندوز)
-        if os.name == 'nt':
-            os.startfile(pdf_path, "print")
-        
-        QMessageBox.information(self, "موفق", "فاکتور چاپ و ذخیره شد.")
-        self.reset_after_save()
+            # چاپ فوری به پرینتر (اولویت اصلی)
+            self.print_to_pos_printer()  # این متد را اضافه می‌کنیم
+            
+            # ذخیره در حافظه برای گزارش روزانه
+            self.save_invoice_action(total, service_fee, discount)
+            
+            # آماده‌سازی برای سفارش بعدی
+            self.reset_after_save()
+            
+            QMessageBox.information(self, "موفق", "فاکتور چاپ شد و سیستم آماده سفارش جدید است")
+            
+        except Exception as e:
+            QMessageBox.critical(self, "خطای چاپ", f"خطا در چاپ فاکتور:\n{str(e)}")
+
+    def print_to_pos_printer(self):
+        """چاپ مستقیم به پرینتر فیش (POS)"""
+        try:
+            # اینجا کد مخصوص چاپگر خود را قرار دهید
+            # مثال برای چاپگرهای ESC/POS:
+            from escpos.printer import Usb
+            printer = Usb(0x04b8, 0x0202)
+            printer.text("------ فاکتور فروش ------\n")
+            printer.text(f"تاریخ: {datetime.now().strftime('%Y/%m/%d %H:%M')}\n")
+            for item in self.current_order:
+                printer.text(f"{item['name']} {item['quantity']} x {item['price']:,}\n")
+            printer.text("------------------------\n")
+            printer.cut()
+            
+        except ImportError:
+            # اگر کتابخانه چاپگر نصب نبود، به صورت خودکار PDF ایجاد شود
+            self.generate_backup_pdf()
 
     def save_invoice(self):
         """ذخیره فاکتور بدون چاپ"""
@@ -443,3 +459,26 @@ class MainWindow(QMainWindow):
         
         # ذخیره فایل
         wb.save(file_path)
+
+    def generate_backup_pdf(self):
+        """ایجاد نسخه پشتیبان PDF در پوشه پروژه"""
+        try:
+            # ساخت پوشه اگر وجود نداشته باشد
+            os.makedirs("فاکتورهای روزانه", exist_ok=True)
+            
+            # نام فایل بر اساس تاریخ و ساعت
+            filename = f"فاکتورهای روزانه/فاکتور_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            
+            # تولید PDF
+            from core.printer import generate_invoice_pdf
+            generate_invoice_pdf([{
+                "id": len(self.temp_invoices) + 1,
+                "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "items": self.current_order,
+                "total": self.calculate_total()[0],
+                "service_fee": self.service_spin.value(),
+                "discount": self.discount_spin.value()
+            }], filename)
+            
+        except Exception as e:
+            print(f"خطا در ایجاد نسخه پشتیبان: {e}")
