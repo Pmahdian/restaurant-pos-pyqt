@@ -72,15 +72,17 @@ class MainWindow(QMainWindow):
             tab = QWidget()
             layout = QVBoxLayout()
 
-            # ایجاد دکمه‌های آیتم‌ها
             for item in items:
                 btn = QPushButton(f"{item['name']}\n{item['price']:,} تومان")
                 btn.setMinimumHeight(60)
-                btn.clicked.connect(lambda _, i=item: self.add_to_order(i))
+                # اصلاح این خط:
+                btn.clicked.connect(lambda _, item=item: self.add_to_order(item))
                 layout.addWidget(btn)
 
             tab.setLayout(layout)
             self.categories_tabs.addTab(tab, category)
+
+  
 
     def add_to_order(self, item):
         """اضافه کردن آیتم به سفارش"""
@@ -141,3 +143,5 @@ class MainWindow(QMainWindow):
             f"حق سرویس: {service_fee:,.0f} | "
             f"تخفیف: {discount:,.0f})"
         )
+
+
