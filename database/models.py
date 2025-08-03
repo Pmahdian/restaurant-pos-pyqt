@@ -2,12 +2,18 @@ from datetime import datetime
 import sqlite3
 
 MENU = {
-    "ساندویچ": [
+
+    "سوسیس ": [
         {"id": 1, "name": " کوکتل", "price": 70000},
         {"id": 2, "name": "کوکتل پنیری ", "price": 83000},
         {"id": 3, "name": " آلمانی ", "price": 63000},
         {"id": 4, "name": " بندری ", "price": 85000},
         {"id": 5, "name": " هات داگ ", "price": 80000},
+    ],
+
+
+    "ساندویچ": [
+      
         {"id": 6, "name": " فلافل ", "price": 65000},
         {"id": 7, "name": " فلافل ویژه ", "price": 90000},
         {"id": 8, "name": " ماکارونی ", "price": 97000},
@@ -50,11 +56,11 @@ MENU = {
 
 }
 
-
 def save_invoice_to_db(items, total, service_fee, discount):
     conn = sqlite3.connect('restaurant.db')
     cursor = conn.cursor()
     
+    # ایجاد جداول با استفاده از پارامترهای ایمن
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS invoices (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,7 +77,7 @@ def save_invoice_to_db(items, total, service_fee, discount):
         item_name TEXT NOT NULL,
         quantity INTEGER NOT NULL,
         price REAL NOT NULL,
-        description TEXT,  # اضافه کردن فیلد توضیحات
+        description TEXT,
         FOREIGN KEY (invoice_id) REFERENCES invoices(id)
     )
     ''')
@@ -84,9 +90,16 @@ def save_invoice_to_db(items, total, service_fee, discount):
     invoice_id = cursor.lastrowid
     
     for item in items:
+        # استفاده از پارامترهای ایمن برای جلوگیری از خطا
         cursor.execute(
-            "INSERT INTO invoice_items VALUES (?, ?, ?, ?, ?)",
-            (invoice_id, item['name'], item['quantity'], item['price'], item.get('description', ''))
+            "INSERT INTO invoice_items (invoice_id, item_name, quantity, price, description) VALUES (?, ?, ?, ?, ?)",
+            (
+                invoice_id, 
+                item['name'], 
+                item['quantity'], 
+                item['price'], 
+                item.get('description', '')
+            )
         )
     
     conn.commit()

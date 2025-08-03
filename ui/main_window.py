@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QTableWidget, QTableWidgetItem,
     QTabWidget, QHeaderView, QSpinBox, QMessageBox,
-    QToolBar, QDialog, QInputDialog
+    QToolBar, QDialog
 )
 from PyQt6.QtCore import Qt
 from datetime import datetime
@@ -48,11 +48,12 @@ class MainWindow(QMainWindow):
 
         right_section = QVBoxLayout()
 
-        # تغییر: 5 ستون برای اضافه کردن توضیحات
+        # 5 ستون برای توضیحات
         self.order_table = QTableWidget(0, 5)
         self.order_table.setHorizontalHeaderLabels(["آیتم", "قیمت", "تعداد", "توضیحات", "حذف"])
         self.order_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.order_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        self.order_table.cellChanged.connect(self.on_cell_changed)  # برای ذخیره تغییرات توضیحات
         right_section.addWidget(self.order_table)
 
         calc_layout = QVBoxLayout()
@@ -128,44 +129,45 @@ class MainWindow(QMainWindow):
             self.categories_tabs.addTab(tab, category)
 
     def add_to_order(self, item):
-        # درخواست توضیحات از کاربر
-        description, ok = QInputDialog.getText(
-            self, 
-            'توضیحات آیتم', 
-            f'توضیحات برای {item["name"]}:',
-            text=item.get('description', '')
-        )
-        if not ok:
-            return
-        
         existing = next((i for i in self.current_order if i["id"] == item["id"]), None)
         if existing:
             existing["quantity"] += 1
-            existing["description"] = description
         else:
             self.current_order.append({
                 "id": item["id"],
                 "name": item["name"],
                 "price": item["price"],
                 "quantity": 1,
-                "description": description
+                "description": item.get('description', '')  # استفاده از توضیحات پیش‌فرض
             })
         self.update_order_table()
 
     def update_order_table(self):
+        self.order_table.blockSignals(True)  # جلوگیری از emit شدن signal در حین آپدیت
+        
         self.order_table.setRowCount(len(self.current_order))
         for row, item in enumerate(self.current_order):
             self.order_table.setItem(row, 0, QTableWidgetItem(item["name"]))
             self.order_table.setItem(row, 1, QTableWidgetItem(f"{item['price']:,}"))
             self.order_table.setItem(row, 2, QTableWidgetItem(str(item["quantity"])))
-            self.order_table.setItem(row, 3, QTableWidgetItem(item.get("description", "")))
+            
+            # آیتم توضیحات با قابلیت ویرایش
+            description_item = QTableWidgetItem(item.get("description", ""))
+            description_item.setFlags(description_item.flags() | Qt.ItemFlag.ItemIsEditable)
+            self.order_table.setItem(row, 3, description_item)
             
             remove_btn = QPushButton("حذف")
             remove_btn.setStyleSheet("background-color: #e74c3c; color: white;")
             remove_btn.clicked.connect(lambda _, r=row: self.remove_item(r))
             self.order_table.setCellWidget(row, 4, remove_btn)
         
+        self.order_table.blockSignals(False)
         self.calculate_total()
+
+    def on_cell_changed(self, row, column):
+        """ذخیره توضیحات هنگام ویرایش در جدول"""
+        if column == 3 and 0 <= row < len(self.current_order):
+            self.current_order[row]["description"] = self.order_table.item(row, column).text()
 
     def remove_item(self, row):
         if 0 <= row < len(self.current_order):
@@ -209,7 +211,7 @@ class MainWindow(QMainWindow):
             invoice_id = self.save_invoice_action(total, service_fee, discount)
             
             # چاپ دو نسخه فاکتور
-            self.print_to_pos_printer(total, invoice_id)
+            self.print_to_pos_printer(total, invoice_id, service_fee, discount)
             
             QMessageBox.information(self, "موفق", "فاکتورها چاپ و ذخیره شدند")
             self.reset_order()
@@ -217,25 +219,26 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "خطا", f"خطا در چاپ فاکتور:\n{str(e)}")
 
     def save_invoice_action(self, total, service_fee, discount):
-        invoice = {
-            "id": self.invoice_counter,
-            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "items": self.current_order.copy(),
-            "total": total,
-            "service_fee": service_fee,
-            "discount": discount,
-        }
-        self.temp_invoices.append(invoice)
-        
         invoice_id = save_invoice_to_db(
             self.current_order,
             total,
             service_fee,
             discount
         )
+        
+        # ذخیره در حافظه موقت برای گزارشات
+        self.temp_invoices.append({
+            "id": invoice_id,
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "items": [item.copy() for item in self.current_order],
+            "total": total,
+            "service_fee": service_fee,
+            "discount": discount,
+        })
+        
         return invoice_id
 
-    def print_to_pos_printer(self, total, invoice_id):
+    def print_to_pos_printer(self, total, invoice_id, service_fee, discount):
         try:
             # چاپ نسخه مشتری
             print("\n\n------ چاپ به پرینتر (نسخه مشتری) ------")
@@ -356,7 +359,12 @@ class MainWindow(QMainWindow):
 
     def reprint_invoice(self, invoice):
         try:
-            self.print_to_pos_printer(invoice["total"], invoice["id"])
+            self.print_to_pos_printer(
+                invoice["total"], 
+                invoice["id"],
+                invoice["service_fee"],
+                invoice["discount"]
+            )
             QMessageBox.information(self, "موفق", f"فاکتور #{invoice['id']} با موفقیت چاپ مجدد شد")
         except Exception as e:
             QMessageBox.critical(self, "خطا", f"خطا در چاپ مجدد:\n{str(e)}")
