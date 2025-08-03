@@ -12,6 +12,7 @@ import os
 from openpyxl import Workbook
 from pathlib import Path
 import platform
+from PyQt6.QtWidgets import QMessageBox
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -21,6 +22,17 @@ class MainWindow(QMainWindow):
         self.temp_invoices = []
         self.invoice_counter = 1
         self.setup_ui()
+ 
+
+    def get_desktop_path():
+        """پیدا کردن مسیر دسکتاپ برای سیستم‌عامل‌های مختلف"""
+        home = Path.home()
+        if platform.system() == "Windows":
+            return home / "Desktop"
+        elif platform.system() == "Darwin":  # macOS
+            return home / "Desktop"
+        else:  # Linux/دیگر سیستم‌ها
+            return home / "Desktop"
 
     def setup_ui(self):
         # ویجت پشته‌ای برای تغییر صفحات
@@ -334,28 +346,29 @@ class MainWindow(QMainWindow):
         """ذخیره دائمی گزارش در پوشه فروش کل روی دسکتاپ"""
         try:
             # ایجاد پوشه فروش کل اگر وجود نداشته باشد
-            desktop = get_desktop_path()
+            desktop = Path(get_desktop_path())
             sales_folder = desktop / "فروش کل"
-            sales_folder.mkdir(exist_ok=True)
+            sales_folder.mkdir(exist_ok=True, parents=True)
             
             # نام فایل براساس تاریخ
             date_str = datetime.now().strftime("%Y-%m-%d")
             
-            # ذخیره به صورت PDF
+            # ذخیره PDF
             pdf_path = sales_folder / f"فروش_{date_str}.pdf"
+            from core.printer import generate_invoice_pdf
             generate_invoice_pdf(self.temp_invoices, str(pdf_path))
             
-            # ذخیره به صورت Excel
+            # ذخیره Excel
             excel_path = sales_folder / f"فروش_{date_str}.xlsx"
             self.save_to_excel(str(excel_path))
             
             QMessageBox.information(
                 self, 
-                "موفق", 
-                f"گزارش با موفقیت ذخیره شد:\nPDF: {pdf_path}\nExcel: {excel_path}"
+                "ذخیره گزارش", 
+                f"گزارش با موفقیت ذخیره شد در:\n{str(sales_folder)}"
             )
         except Exception as e:
-            QMessageBox.critical(self, "خطا", f"خطا در ذخیره گزارش: {str(e)}")
+            QMessageBox.critical(self, "خطا", f"خطا در ذخیره گزارش:\n{str(e)}")
 
     def print_report(self):
         """چاپ گزارش به صورت PDF"""
