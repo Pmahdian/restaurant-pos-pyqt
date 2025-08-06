@@ -55,12 +55,11 @@ MENU = {
 
 
 }
-
 def save_invoice_to_db(items, total, service_fee, discount):
     conn = sqlite3.connect('restaurant.db')
     cursor = conn.cursor()
     
-    # ایجاد جداول با استفاده از پارامترهای ایمن
+    # ایجاد جداول با ساختار جدید
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS invoices (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -73,6 +72,7 @@ def save_invoice_to_db(items, total, service_fee, discount):
     
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS invoice_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         invoice_id INTEGER,
         item_name TEXT NOT NULL,
         quantity INTEGER NOT NULL,
@@ -82,6 +82,12 @@ def save_invoice_to_db(items, total, service_fee, discount):
     )
     ''')
     
+    # بررسی وجود ستون description و اضافه کردن اگر وجود نداشت
+    cursor.execute("PRAGMA table_info(invoice_items)")
+    columns = [column[1] for column in cursor.fetchall()]
+    if 'description' not in columns:
+        cursor.execute("ALTER TABLE invoice_items ADD COLUMN description TEXT")
+    
     date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     cursor.execute(
         "INSERT INTO invoices (date, total, service_fee, discount) VALUES (?, ?, ?, ?)",
@@ -90,7 +96,6 @@ def save_invoice_to_db(items, total, service_fee, discount):
     invoice_id = cursor.lastrowid
     
     for item in items:
-        # استفاده از پارامترهای ایمن برای جلوگیری از خطا
         cursor.execute(
             "INSERT INTO invoice_items (invoice_id, item_name, quantity, price, description) VALUES (?, ?, ?, ?, ?)",
             (

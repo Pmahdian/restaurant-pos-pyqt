@@ -149,9 +149,13 @@ class MainWindow(QMainWindow):
         for row, item in enumerate(self.current_order):
             self.order_table.setItem(row, 0, QTableWidgetItem(item["name"]))
             self.order_table.setItem(row, 1, QTableWidgetItem(f"{item['price']:,}"))
-            self.order_table.setItem(row, 2, QTableWidgetItem(str(item["quantity"])))
             
-            # آیتم توضیحات با قابلیت ویرایش
+            # ستون تعداد (غیر قابل ویرایش)
+            quantity_item = QTableWidgetItem(str(item["quantity"]))
+            quantity_item.setFlags(quantity_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            self.order_table.setItem(row, 2, quantity_item)
+            
+            # ستون توضیحات (قابل ویرایش)
             description_item = QTableWidgetItem(item.get("description", ""))
             description_item.setFlags(description_item.flags() | Qt.ItemFlag.ItemIsEditable)
             self.order_table.setItem(row, 3, description_item)

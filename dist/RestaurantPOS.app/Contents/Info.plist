@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>RestaurantPOS</string>
+	<key>CFBundleExecutable</key>
+	<string>RestaurantPOS</string>
+	<key>CFBundleIconFile</key>
+	<string>generated-c61a9b84f53a60d1df6eb288ec1836a039b4008db6d0bb1e721d8f9ec8f3fa00.icns</string>
+	<key>CFBundleIdentifier</key>
+	<string>RestaurantPOS</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>RestaurantPOS</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.0.0</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+</dict>
+</plist>

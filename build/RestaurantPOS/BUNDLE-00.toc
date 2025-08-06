@@ -1,0 +1,3 @@
+([('RestaurantPOS',
+   '/Users/parnian/Documents/GitHub/restaurant-pos-pyqt/dist/RestaurantPOS',
+   'EXECUTABLE')],)
