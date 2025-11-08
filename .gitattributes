@@ -1,0 +1,7 @@
+
+*.tex linguist-detectable=false
+*.cls linguist-detectable=false  
+*.bst linguist-detectable=false
+*.sty linguist-detectable=false
+
+README.md linguist-detectable=false
